@@ -12,6 +12,11 @@ float previousY = 0;
 float previousZ = 0;
 bool firstReading = true;
 
+// Stillness timer
+unsigned long stillStartTime = 0;
+bool stillTimerRunning = false;
+
+const unsigned long stillTime = 15000;  // 3 seconds
 
 void setup() {
 
@@ -41,6 +46,7 @@ void loop() {
   sensors_event_t temp;
 
   mpu.getEvent(&accel, &gyro, &temp);
+
   float deltaX = accel.acceleration.x - previousX;
   float deltaY = accel.acceleration.y - previousY;
   float deltaZ = accel.acceleration.z - previousZ;
@@ -62,17 +68,51 @@ void loop() {
   Serial.print("Motion Score: ");
   Serial.println(motion);
 
+  // MOVING
   if (motion > 0.5) {
+
     Serial.println("MOVING");
 
+    // Reset stillness timer
+    stillTimerRunning = false;
+
+    // Green = person is moving
     digitalWrite(greenLED, HIGH);
     digitalWrite(redLED, LOW);
 
-  } else {
+  }
+
+  // STILL
+  else {
+
     Serial.println("STILL");
 
-    digitalWrite(greenLED, LOW);
-    digitalWrite(redLED, HIGH);
+    // Start the stillness timer
+    if (!stillTimerRunning) {
+      stillStartTime = millis();
+      stillTimerRunning = true;
+
+      Serial.println("Stillness timer started!");
+    }
+
+    // Check how long the person has been still
+    unsigned long stillDuration = millis() - stillStartTime;
+
+    if (stillDuration >= stillTime) {
+
+      // Still for 3+ seconds = RED
+      digitalWrite(greenLED, LOW);
+      digitalWrite(redLED, HIGH);
+
+      Serial.println("!!! STILL TOO LONG !!!");
+
+    } else {
+
+      // Still for less than 3 seconds = stay GREEN
+      digitalWrite(greenLED, HIGH);
+      digitalWrite(redLED, LOW);
+    }
   }
+
   delay(200);
 }
