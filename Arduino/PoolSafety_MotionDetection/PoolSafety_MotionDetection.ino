@@ -4,6 +4,9 @@
 
 Adafruit_MPU6050 mpu;
 
+const int greenLED = 23;
+const int redLED = 18;
+
 float previousX = 0;
 float previousY = 0;
 float previousZ = 0;
@@ -11,6 +14,9 @@ bool firstReading = true;
 
 
 void setup() {
+
+  pinMode(greenLED, OUTPUT);
+  pinMode(redLED, OUTPUT);
 
   Serial.begin(115200);
 
@@ -35,33 +41,38 @@ void loop() {
   sensors_event_t temp;
 
   mpu.getEvent(&accel, &gyro, &temp);
+  float deltaX = accel.acceleration.x - previousX;
+  float deltaY = accel.acceleration.y - previousY;
+  float deltaZ = accel.acceleration.z - previousZ;
 
   float motion =
-  abs(accel.acceleration.x)
-  +
-  abs(accel.acceleration.y)
-  +
-  abs(accel.acceleration.z - 9.8);
+    abs(deltaX) +
+    abs(deltaY) +
+    abs(deltaZ);
+
+  if (firstReading) {
+    motion = 0;
+    firstReading = false;
+  }
+
+  previousX = accel.acceleration.x;
+  previousY = accel.acceleration.y;
+  previousZ = accel.acceleration.z;
 
   Serial.print("Motion Score: ");
   Serial.println(motion);
-  if (motion > 2.0)
-  {
-      Serial.println("MOVING");
+
+  if (motion > 0.5) {
+    Serial.println("MOVING");
+
+    digitalWrite(greenLED, HIGH);
+    digitalWrite(redLED, LOW);
+
+  } else {
+    Serial.println("STILL");
+
+    digitalWrite(greenLED, LOW);
+    digitalWrite(redLED, HIGH);
   }
-  else
-  {
-      Serial.println("STILL");
-  }
-
-  Serial.print("X: ");
-  Serial.print(accel.acceleration.x);
-
-  Serial.print("   Y: ");
-  Serial.print(accel.acceleration.y);
-
-  Serial.print("   Z: ");
-  Serial.println(accel.acceleration.z);
-
   delay(200);
 }
