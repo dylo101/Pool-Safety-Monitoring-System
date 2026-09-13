@@ -82,6 +82,30 @@ The buzzer retains its separate direct GND connection. The red rail is supplied 
 
 The [DROK product listing](https://www.amazon.com/dp/B0FLDQJ71M) identifies these wire colors and states that the adapter includes a pull-up resistor. No additional loose resistor was added to the working setup. Secure bare wire ends in the terminals without allowing loose strands to touch adjacent terminals.
 
+## Breadboard photo reference
+
+These three photos document the working breadboard layout after the temperature sensor was added. Use them alongside the wiring tables above when restoring a disconnected wire. Some wire endpoints, including the temperature adapter and ESP32 pins, are outside the frame or obscured; the photos do not replace the connection list.
+
+The images are saved in the project as full-resolution JPEG copies so they display in the README without depending on the original files in Downloads. Click a photo to open it for a closer look.
+
+### View 1: Power-rail connections and component layout
+
+The shared power-rail wiring is at the left, the blue MPU6050 is near the middle-left, and the LEDs and buzzer are at the right.
+
+[![Breadboard showing power-rail jumpers, MPU6050, LED resistors, LEDs, and buzzer](docs/images/breadboard-1081.jpg)](docs/images/breadboard-1081.jpg)
+
+### View 2: Opposite side
+
+This angle shows the buzzer and LEDs at the left and the MPU6050 header connections at the right.
+
+[![Opposite-side view of the buzzer, LEDs, and MPU6050 header connections](docs/images/breadboard-1082.jpg)](docs/images/breadboard-1082.jpg)
+
+### View 3: Angled view of component placement
+
+This view shows the buzzer, LED legs and resistors, breadboard row markings, and the MPU6050 from above at an angle.
+
+[![Angled breadboard view showing buzzer, LEDs, resistors, row markings, and MPU6050](docs/images/breadboard-1083.jpg)](docs/images/breadboard-1083.jpg)
+
 ## Arduino setup
 
 The main sketch is `Arduino/PoolSafety_MotionDetection/PoolSafety_MotionDetection.ino`.
@@ -141,6 +165,11 @@ Arduino/
     ESP32_test.ino
   PoolSafety_MotionDetection/
     PoolSafety_MotionDetection.ino
+docs/
+  images/
+    breadboard-1081.jpg
+    breadboard-1082.jpg
+    breadboard-1083.jpg
 README.md
 ```
 
