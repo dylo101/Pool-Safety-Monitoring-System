@@ -1,11 +1,42 @@
 #include <Wire.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 Adafruit_MPU6050 mpu;
 
 const int greenLED = 23;
 const int redLED = 18;
+const int buzzer = 19;
+const int temperaturePin = 4;
+
+OneWire oneWire(temperaturePin);
+DallasTemperature temperatureSensor(&oneWire);
+unsigned long temperatureRequestTime = 0;
+const unsigned long temperatureInterval = 1000;
+
+void updateTemperature() {
+  // A 12-bit conversion takes up to 750 ms. Read after one second
+  // without making motion detection wait for the conversion.
+  if (millis() - temperatureRequestTime < temperatureInterval) {
+    return;
+  }
+
+  float temperatureC = temperatureSensor.getTempCByIndex(0);
+  if (temperatureC == DEVICE_DISCONNECTED_C) {
+    Serial.println("Temperature sensor not detected. Check DAT, VCC and GND.");
+  } else {
+    Serial.print("Probe Temperature: ");
+    Serial.print(temperatureC, 2);
+    Serial.print(" C / ");
+    Serial.print(DallasTemperature::toFahrenheit(temperatureC), 2);
+    Serial.println(" F");
+  }
+
+  temperatureSensor.requestTemperatures();
+  temperatureRequestTime = millis();
+}
 
 float previousX = 0;
 float previousY = 0;
@@ -16,12 +47,14 @@ bool firstReading = true;
 unsigned long stillStartTime = 0;
 bool stillTimerRunning = false;
 
-const unsigned long stillTime = 15000;  // 3 seconds
+const unsigned long stillTime = 15000;  // 15 seconds
 
 void setup() {
 
   pinMode(greenLED, OUTPUT);
   pinMode(redLED, OUTPUT);
+  pinMode(buzzer, OUTPUT);
+  digitalWrite(buzzer, LOW);
 
   Serial.begin(115200);
 
@@ -37,6 +70,13 @@ void setup() {
   }
 
   Serial.println("MPU6050 Ready!");
+
+  temperatureSensor.begin();
+  temperatureSensor.setResolution(12);
+  temperatureSensor.setWaitForConversion(false);
+  temperatureSensor.requestTemperatures();
+  temperatureRequestTime = millis();
+  Serial.println("Temperature readings enabled on D4.");
 }
 
 void loop() {
@@ -79,6 +119,8 @@ void loop() {
     // Green = person is moving
     digitalWrite(greenLED, HIGH);
     digitalWrite(redLED, LOW);
+    digitalWrite(buzzer, LOW);
+
 
   }
 
@@ -100,19 +142,24 @@ void loop() {
 
     if (stillDuration >= stillTime) {
 
-      // Still for 3+ seconds = RED
+      // Still for 15+ seconds = RED + buzzer
       digitalWrite(greenLED, LOW);
       digitalWrite(redLED, HIGH);
+      digitalWrite(buzzer, HIGH);
+
 
       Serial.println("!!! STILL TOO LONG !!!");
 
     } else {
 
-      // Still for less than 3 seconds = stay GREEN
+      // Still for less than 15 seconds = stay GREEN
       digitalWrite(greenLED, HIGH);
       digitalWrite(redLED, LOW);
+      digitalWrite(buzzer, LOW);
+
     }
   }
 
+  updateTemperature();
   delay(200);
 }
