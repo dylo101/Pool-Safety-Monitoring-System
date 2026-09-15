@@ -135,6 +135,44 @@ During operation, the monitor displays motion scores, `MOVING` or `STILL`, timer
 Probe Temperature: 23.50 C / 74.30 F
 ```
 
+## Recording readings on your computer
+
+The USB logger runs on macOS or Linux with Python 3.8 or newer and needs no extra Python packages. It reads the current sketch's messages; no firmware upload or wiring change is needed.
+
+1. Connect the ESP32 by USB.
+2. Close Arduino Serial Monitor and Serial Plotter so the logger can use the port.
+3. In Terminal, run:
+
+```bash
+cd ~/Pool-Safety-Monitoring-System
+python3 tools/log_sensors.py
+```
+
+4. Perform a motion/stillness test or warm the temperature probe in your hand.
+5. Press **Control+C** to stop recording and release the serial port.
+
+Each run creates a timestamped CSV and a raw serial text log in `logs/`. The CSV opens in Excel or another spreadsheet application. Files are flushed during recording, and new runs create new files rather than overwriting previous recordings. Generated logs are excluded from Git.
+
+CSV columns:
+
+| Column | Meaning |
+|---|---|
+| `time` | Mac/computer local receive time with timezone, not an ESP32 measurement timestamp |
+| `motion_score` | Motion score printed by the sketch |
+| `state` | `MOVING`, `STILL_WAITING`, `ALERT`, or `UNKNOWN` if the cycle's state message was missing |
+| `temperature_c`, `temperature_f` | Probe reading when printed during this cycle; blank on other cycles |
+
+Motion readings arrive more often than temperature readings, so blank temperature cells are normal. Missing-sensor messages are retained in the raw log and displayed in Terminal. Each row is completed when the next motion cycle begins; the last unfinished cycle is kept only in the raw log. Older buffered input is discarded at startup.
+
+For a timed recording or a different USB port:
+
+```bash
+python3 tools/log_sensors.py --seconds 60
+python3 tools/log_sensors.py --port /dev/cu.usbserial-0001
+```
+
+If no readings arrive, check the USB connection, port selection, and that Serial Monitor/Plotter are closed.
+
 ## Confirmed tests
 
 - Moving the MPU6050 turns the green LED on and keeps the buzzer silent.
@@ -178,6 +216,6 @@ README.md
 These items are not implemented yet:
 
 - Record a complete wiring diagram, including I2C pins, LED resistor values, and the buzzer model.
-- Save sensor readings to a log for later analysis.
+- Analyze recorded sensor logs and compare different bench tests.
 - Add a dashboard or network communication.
 - Evaluate sensor placement, enclosure design, and behavior beyond bench testing.
