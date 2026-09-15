@@ -135,6 +135,21 @@ During operation, the monitor displays motion scores, `MOVING` or `STILL`, timer
 Probe Temperature: 23.50 C / 74.30 F
 ```
 
+## Live dashboard
+
+The repository includes a local dashboard with current motion, alert state, temperature, live graphs, and CSV recording controls. No additional Python packages or Arduino upload are required.
+
+Close Serial Monitor/Plotter and the standalone logger, then run:
+
+```bash
+cd ~/Pool-Safety-Monitoring-System
+python3 dashboard/server.py
+```
+
+Open <http://127.0.0.1:8765>. Use **Start recording** and **Stop recording** to save a test to `logs/`. Press **Control+C** in Terminal to stop the dashboard.
+
+See [dashboard setup and behavior](dashboard/README.md) for connection troubleshooting and recording details. The dashboard runs on macOS/Linux with Python 3.8+ and does not require internet access.
+
 ## Recording readings on your computer
 
 The USB logger runs on macOS or Linux with Python 3.8 or newer and needs no extra Python packages. It reads the current sketch's messages; no firmware upload or wiring change is needed.
@@ -217,5 +232,5 @@ These items are not implemented yet:
 
 - Record a complete wiring diagram, including I2C pins, LED resistor values, and the buzzer model.
 - Analyze recorded sensor logs and compare different bench tests.
-- Add a dashboard or network communication.
+- Add Wi-Fi communication beyond the current local USB dashboard.
 - Evaluate sensor placement, enclosure design, and behavior beyond bench testing.
