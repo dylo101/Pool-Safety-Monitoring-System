@@ -14,6 +14,10 @@ import sys
 import termios
 import threading
 import time
+import math
+import urllib.request
+import urllib.error
+import ipaddress
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -21,8 +25,9 @@ from log_sensors import Parser, FIELDS
 
 
 class Monitor:
-    def __init__(self, port):
+    def __init__(self, port, host=None):
         self.port = port
+        self.host = host
         self.lock = threading.RLock()
         self.stop = threading.Event()
         self.rows = deque(maxlen=1500)
@@ -74,7 +79,38 @@ class Monitor:
             return dict(rows=list(self.rows), connected=bool(self.last and now-self.last < 3),
                         error=self.error, temperature=self.temperature if now-self.temperature_time < 5 else None,
                         recording=self.record_file is not None, filename=self.record_name,
-                        count=self.record_count, port=self.port)
+                        count=self.record_count, port=self.port,
+                        transport='Wi-Fi' if self.host else 'USB')
+
+    def run_wifi(self):
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        previous_sequence = None
+        while not self.stop.is_set():
+            try:
+                with opener.open(f'http://{self.host}/readings', timeout=1.5) as response:
+                    payload = json.loads(response.read(8192))
+                sequence = payload['sequence']
+                if not isinstance(sequence, int) or payload['state'] not in ('MOVING', 'STILL_WAITING', 'ALERT', 'UNKNOWN'):
+                    raise ValueError('Invalid sensor state')
+                for key in ('motion_score', 'temperature_c', 'temperature_f'):
+                    value = payload[key]
+                    if value is None and key != 'motion_score':
+                        continue
+                    if not isinstance(value, (int, float)) or not math.isfinite(value):
+                        raise ValueError('Invalid sensor reading')
+                if sequence != previous_sequence:
+                    row = {key: payload[key] if payload[key] is not None else '' for key in FIELDS if key != 'time'}
+                    row['time'] = datetime.now().astimezone().isoformat(timespec='milliseconds')
+                    if payload['temperature_f'] is None:
+                        with self.lock:
+                            self.temperature = None
+                            self.temperature_time = 0
+                    self.accept(row)
+                    previous_sequence = sequence
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                with self.lock:
+                    self.error = f'Wi-Fi readings unavailable: {exc}. Check ESP32 power and network.'
+            self.stop.wait(.2)
 
     def run(self):
         while not self.stop.is_set():
@@ -169,10 +205,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', default='/dev/cu.usbserial-0001')
     parser.add_argument('--http-port', type=int, default=8765)
+    parser.add_argument('--esp32', help='ESP32 IPv4 address; omit for USB')
     args = parser.parse_args()
-    monitor = Monitor(args.port)
+    if args.esp32:
+        try:
+            ipaddress.IPv4Address(args.esp32)
+        except ValueError:
+            parser.error('--esp32 must be an IPv4 address')
+    monitor = Monitor(args.port, args.esp32)
     server = ThreadingHTTPServer(('127.0.0.1', args.http_port), handler_for(monitor))
-    worker = threading.Thread(target=monitor.run, daemon=True)
+    worker = threading.Thread(target=monitor.run_wifi if args.esp32 else monitor.run, daemon=True)
     worker.start()
     def interrupt(*unused):
         raise KeyboardInterrupt

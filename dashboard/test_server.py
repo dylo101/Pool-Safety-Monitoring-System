@@ -1,4 +1,6 @@
 import csv
+import json
+from io import BytesIO
 from pathlib import Path
 import tempfile
 import time
@@ -8,6 +10,24 @@ from server import Monitor
 
 
 class MonitorTests(unittest.TestCase):
+    def test_wifi_reader_accepts_json_without_serial(self):
+        m = Monitor('unused', '192.168.1.2')
+        payload = dict(sequence=12, state='ALERT', motion_score=.12,
+                       temperature_c=20, temperature_f=68)
+        original_accept = m.accept
+        def accept_and_stop(row):
+            original_accept(row)
+            m.stop.set()
+        m.accept = accept_and_stop
+        with patch('server.urllib.request.build_opener') as opener:
+            opener.return_value.open.return_value = BytesIO(json.dumps(payload).encode())
+            m.run_wifi()
+        snapshot = m.snapshot()
+        self.assertEqual(snapshot['transport'], 'Wi-Fi')
+        self.assertTrue(snapshot['connected'])
+        self.assertEqual(snapshot['rows'][0]['state'], 'ALERT')
+        self.assertEqual(snapshot['temperature'], 68)
+
     def row(self):
         return dict(time='2026-09-14T21:00:00-07:00', motion_score=.1,
                     state='ALERT', temperature_c='20.0', temperature_f='68.0')

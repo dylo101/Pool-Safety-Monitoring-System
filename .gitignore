@@ -1,2 +1,3 @@
 logs/
 __pycache__/
+Arduino/PoolSafety_MotionDetection/wifi_secrets.h

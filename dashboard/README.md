@@ -1,5 +1,17 @@
 # Live USB dashboard
 
+## Wi-Fi option
+
+Copy `Arduino/PoolSafety_MotionDetection/wifi_secrets.example.h` to `wifi_secrets.h` in the same folder and enter your 2.4 GHz network name and password locally. The credentials file is ignored by Git. Never commit it or share firmware binaries, which also contain the credentials.
+
+Upload the main sketch, then open Serial Monitor at 115200 baud. Look for `Wi-Fi connected. ESP32 address:` followed by an IP address. Start the dashboard with `python3 dashboard/server.py --esp32 YOUR_ESP32_IP` using that address. The Mac and ESP32 must be on the same reachable local network. The router may assign a new address after a restart.
+
+The ESP32 exposes read-only measurements at `http://YOUR_ESP32_IP/readings` to devices on that network without authentication. Use a trusted local network; no router port forwarding is required. The dashboard still listens only on the Mac's loopback address.
+
+Wi-Fi mode polls the latest measurement, so it may skip motion samples or brief transitions. It is not a lossless event log. Temperature columns contain the latest probe value at each poll, unlike USB mode where they are blank between probe updates. Stale/failed connections become unavailable, and polling retries automatically. USB remains available by starting without `--esp32`; switching transport requires restarting the dashboard. The ESP32 always needs power, even when readings travel over Wi-Fi.
+
+Wi-Fi connection attempts do not wait in a connection loop. LEDs, buzzer, and serial output continue when Wi-Fi is unavailable. Network request servicing can still add loop latency; repeat the motion/15-second alert test after uploading.
+
 Run on macOS or Linux using **Python 3.8+**. No pip packages, internet connection, or firmware changes are required. The interface uses browser-native JavaScript and SVG; all assets are local. Windows is not supported by this serial reader.
 
 1. Connect the ESP32 and close Arduino Serial Monitor/Plotter and the standalone CSV logger.

@@ -3,6 +3,41 @@
 #include <Adafruit_Sensor.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#if __has_include("wifi_secrets.h")
+#include "wifi_secrets.h"
+#else
+const char* WIFI_SSID = "";
+const char* WIFI_PASSWORD = "";
+#endif
+
+WebServer sensorServer(80);
+float latestMotion = 0;
+float latestTemperature = 0;
+bool temperatureValid = false;
+const char* latestState = "UNKNOWN";
+unsigned long sampleSequence = 0;
+unsigned long wifiRetryTime = 0;
+bool wifiWasConnected = false;
+
+void serviceWifi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!wifiWasConnected) {
+      Serial.print("Wi-Fi connected. ESP32 address: ");
+      Serial.println(WiFi.localIP());
+      wifiWasConnected = true;
+    }
+    sensorServer.handleClient();
+  } else {
+    if (wifiWasConnected) Serial.println("Wi-Fi disconnected; USB and alerts remain active.");
+    wifiWasConnected = false;
+    if (strlen(WIFI_SSID) && millis() - wifiRetryTime >= 15000) {
+      wifiRetryTime = millis();
+      WiFi.reconnect();
+    }
+  }
+}
 
 Adafruit_MPU6050 mpu;
 
@@ -24,14 +59,16 @@ void updateTemperature() {
   }
 
   float temperatureC = temperatureSensor.getTempCByIndex(0);
+  temperatureValid = temperatureC != DEVICE_DISCONNECTED_C;
+  latestTemperature = temperatureC;
   if (temperatureC == DEVICE_DISCONNECTED_C) {
     Serial.println("Temperature sensor not detected. Check DAT, VCC and GND.");
   } else {
-    Serial.print("Probe Temperature: ");
-    Serial.print(temperatureC, 2);
-    Serial.print(" C / ");
-    Serial.print(DallasTemperature::toFahrenheit(temperatureC), 2);
-    Serial.println(" F");
+    //Serial.print("Probe Temperature: ");
+    //Serial.print(temperatureC, 2);
+    //Serial.print(" C / ");
+    //Serial.print(DallasTemperature::toFahrenheit(temperatureC), 2);
+    //Serial.println(" F");
   }
 
   temperatureSensor.requestTemperatures();
@@ -77,6 +114,20 @@ void setup() {
   temperatureSensor.requestTemperatures();
   temperatureRequestTime = millis();
   Serial.println("Temperature readings enabled on D4.");
+  WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  if (strlen(WIFI_SSID)) WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  sensorServer.on("/readings", HTTP_GET, []() {
+    String json = "{\"sequence\":" + String(sampleSequence);
+    json += ",\"motion_score\":" + String(latestMotion, 2);
+    json += ",\"state\":\"" + String(latestState) + "\"";
+    json += ",\"temperature_c\":" + (temperatureValid ? String(latestTemperature, 2) : String("null"));
+    json += ",\"temperature_f\":" + (temperatureValid ? String(DallasTemperature::toFahrenheit(latestTemperature), 2) : String("null"));
+    json += "}";
+    sensorServer.sendHeader("Cache-Control", "no-store");
+    sensorServer.send(200, "application/json", json);
+  });
+  sensorServer.begin();
 }
 
 void loop() {
@@ -105,13 +156,14 @@ void loop() {
   previousY = accel.acceleration.y;
   previousZ = accel.acceleration.z;
 
-  Serial.print("Motion Score: ");
-  Serial.println(motion);
+  //Serial.print("Motion Score: ");
+  //Serial.println(motion);
 
   // MOVING
   if (motion > 0.5) {
+    latestState = "MOVING";
 
-    Serial.println("MOVING");
+    //Serial.println("MOVING");
 
     // Reset stillness timer
     stillTimerRunning = false;
@@ -127,20 +179,21 @@ void loop() {
   // STILL
   else {
 
-    Serial.println("STILL");
+    //Serial.println("STILL");
 
     // Start the stillness timer
     if (!stillTimerRunning) {
       stillStartTime = millis();
       stillTimerRunning = true;
 
-      Serial.println("Stillness timer started!");
+      //Serial.println("Stillness timer started!");
     }
 
     // Check how long the person has been still
     unsigned long stillDuration = millis() - stillStartTime;
 
     if (stillDuration >= stillTime) {
+      latestState = "ALERT";
 
       // Still for 15+ seconds = RED + buzzer
       digitalWrite(greenLED, LOW);
@@ -148,9 +201,10 @@ void loop() {
       digitalWrite(buzzer, HIGH);
 
 
-      Serial.println("!!! STILL TOO LONG !!!");
+      //Serial.println("!!! STILL TOO LONG !!!");
 
     } else {
+      latestState = "STILL_WAITING";
 
       // Still for less than 15 seconds = stay GREEN
       digitalWrite(greenLED, HIGH);
@@ -161,5 +215,8 @@ void loop() {
   }
 
   updateTemperature();
+  latestMotion = motion;
+  sampleSequence++;
+  serviceWifi();
   delay(200);
 }

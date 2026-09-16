@@ -137,6 +137,8 @@ Probe Temperature: 23.50 C / 74.30 F
 
 ## Live dashboard
 
+Wi-Fi is also supported: configure the ignored `wifi_secrets.h`, upload the sketch, and start the dashboard with `python3 dashboard/server.py --esp32 YOUR_ESP32_IP`. See [Wi-Fi setup](dashboard/README.md#wi-fi-option). USB remains the default connection. Live Wi-Fi readings were verified on September 15, 2026, using ESP32 address `192.168.254.165`. This address may change after a router or device restart. Testing Wi-Fi disconnect/reconnect and the physical alert sequence in Wi-Fi mode remains to be completed.
+
 The repository includes a local dashboard with current motion, alert state, temperature, live graphs, and CSV recording controls. No additional Python packages or Arduino upload are required.
 
 Close Serial Monitor/Plotter and the standalone logger, then run:
