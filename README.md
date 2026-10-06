@@ -4,7 +4,7 @@ An ESP32 prototype that measures movement of a float-mounted MPU6050 and alerts 
 
 ## Current status
 
-The sensors and previous stillness-alert firmware were tested on the bench. The float assembly has now been tested in a water tank, with distinct recordings for calm water, small ripples, and larger disturbances. The activity-alarm firmware and dashboard controls are implemented and software-tested; they still require uploading and physical verification. Full-size pool testing and internet-based phone notifications remain future work. This portfolio prototype detects device movement; it does not establish a swimmer's safety or detect drowning.
+The sensors and previous stillness-alert firmware were tested on the bench. The float assembly has now been tested in a water tank, with distinct recordings for calm water, small ripples, and larger disturbances. The activity-alarm firmware, dashboard controls, and optional Mac-to-phone notifications through ntfy are implemented and software-tested. The activity alarm and phone delivery still need physical verification. Full-size pool testing remains future work. This portfolio prototype detects device movement; it does not establish a swimmer's safety or detect drowning.
 
 ## How it works
 
@@ -255,6 +255,7 @@ These items are not implemented yet:
 
 - Record a complete wiring diagram, including I2C pins, LED resistor values, and the buzzer model.
 - Analyze recorded sensor logs and compare different bench tests.
-- Add authenticated internet access and remote phone notifications.
+- Verify [iPhone notifications](dashboard/README.md#phone-notifications-iphone) during controlled tank trials and capture a complete demo.
+- Add authenticated remote dashboard access or an always-on gateway to replace the Mac bridge.
 - Build a splash-protected enclosure and secure permanent connections.
 - Measure repeatable event detection and false alarms, then evaluate behavior in a full-size pool.

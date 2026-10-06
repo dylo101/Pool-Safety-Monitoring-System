@@ -1,6 +1,6 @@
 # Pool activity dashboard
 
-The dashboard runs on your Mac and supports USB or Wi-Fi. It controls the alarm on the ESP32; the ESP32 continues monitoring and sounding a latched alarm if the dashboard or network disconnects. This is a local prototype. Access from outside the property and phone notifications are not implemented.
+The dashboard runs on your Mac and supports USB or Wi-Fi. It controls the alarm on the ESP32; the ESP32 continues monitoring and sounding a latched alarm if the dashboard or network disconnects. Optional phone notifications use the Mac as an internet bridge to ntfy. Viewing the dashboard from outside the property is not implemented.
 
 ## Upload the new firmware first
 
@@ -17,7 +17,7 @@ cd ~/Pool-Safety-Monitoring-System
 python3 dashboard/server.py --port /dev/cu.usbserial-0001
 ```
 
-Open <http://127.0.0.1:8765>. No Wi-Fi or internet is needed. If the serial port changes, use its current name. Press Control+C to stop the server.
+Open <http://127.0.0.1:8765>. USB readings, controls, and recording do not need Wi-Fi or internet. Phone notifications need internet on the Mac. If the serial port changes, use its current name. Press Control+C to stop the server.
 
 ## Wi-Fi option
 
@@ -49,6 +49,27 @@ The default threshold is 0.50. Lower values are more sensitive. Five samples spa
 Controls wait for confirmation from the ESP32. A timeout never implies success: check the displayed device state before retrying. Controls become unavailable when readings are stale. If the connection is lost, the dashboard cannot confirm or change the device state; it does not disarm the device. Arming and alarm detection require the updated firmware. Old firmware can still display readings, but controls stay disabled and its states are labeled as old firmware.
 
 A motion sensor that fails during operation reports a fault until reset. If an alarm was already active, it stays active and can still be acknowledged. Reset/power loss clears the volatile state and starts disarmed.
+
+## Phone notifications (iPhone)
+
+The path is **ESP32 → USB or local Wi-Fi → Mac dashboard → ntfy.sh → iPhone**. Your phone can use cellular data or a different Wi-Fi network. Keep the Mac awake, online, and running the dashboard; its browser tab can be closed. No router port forwarding is needed. This addition does not require another firmware upload if the activity-alarm sketch is already running.
+
+1. Install [ntfy for iPhone](https://apps.apple.com/us/app/ntfy/id1625396347) and allow notifications.
+2. Stop the running dashboard with Control+C, restart it using the same USB or Wi-Fi command above, and refresh <http://127.0.0.1:8765>.
+3. Under **Phone notifications**, click **Open phone setup**. This generates a long random topic; setup alone does not send messages or enable alarms.
+4. In ntfy, add a subscription to that exact topic on the default server **https://ntfy.sh**. Use **Copy topic** to avoid typing errors. Keep this topic out of public screenshots, repositories, and demo videos: anyone who knows the topic can subscribe or publish. This channel has no account-based access control.
+5. Close ntfy or lock your phone. Click **Send test notification**, then check that the phone receives it. A dashboard message saying ntfy accepted it confirms only service acceptance. If nothing arrives, verify the topic, notification permission, internet access, and iPhone Focus settings. See [ntfy's phone documentation](https://docs.ntfy.sh/subscribe/phone/).
+6. Click **Enable alarm notifications**. Hide setup before recording a public demo.
+7. Arm monitoring, allow settling, and gently disturb the water. Verify the local alarm and a phone notification. Leave the alarm active for 20 seconds and confirm repeated readings do not queue additional messages. Acknowledge, rearm, and repeat to verify a second event.
+8. For a remote demo, put the iPhone on cellular data while keeping the Mac online. Record the disturbance, dashboard, local buzzer, and arriving phone alert. The phone cannot open this localhost dashboard remotely.
+
+Alarm notifications start **off**. The topic and enabled preference persist in `dashboard/notification_settings.json`, an owner-readable file excluded from Git. Only opening setup reveals the topic; it is omitted from normal status responses and application logs. Alert messages contain a generic disturbance description and the Mac's observation time, not your sensor recordings or address. Messages are sent through the hosted ntfy service; its public-topic privacy model is described in the [publishing documentation](https://docs.ntfy.sh/publish/).
+
+The sender reacts to the first `ALERT` reading from the activity-alarm firmware. It sends once while that alarm remains active, including through a dashboard connection interruption. Acknowledging and later triggering another alarm permits another message. Old stillness-firmware alerts do not send notifications. Enabling notifications during an existing alarm, or restarting the dashboard while an alarm is active, can notify again. A lost sensor connection is displayed on the dashboard but does not produce a separate phone notification.
+
+Publishing runs in a separate worker with up to three attempts for transient failures. Requests time out after five seconds; retries wait two and then five seconds. Failure is shown in the phone panel and does not stop sensor reading, controls, recording, or the ESP32 alarm. If a service accepted a request but its response was lost, a retry may produce a duplicate phone message. Turning notifications off cancels queued jobs; an already submitted request cannot be recalled. At most 20 jobs wait in memory; jobs older than two minutes are discarded and do not survive a server restart. The panel reports failures and pending jobs, rather than claiming phone receipt.
+
+Phone delivery still needs verification on your actual iPhone. This is a portfolio notification demonstration, not validated pool safety coverage.
 
 ## Graphs, events, and recording
 
@@ -89,4 +110,4 @@ c++ -std=c++11 -Wall -Wextra -pedantic tests/activity_alarm_test.cpp -o /tmp/poo
 /tmp/pool-activity-test
 ```
 
-The C++ test exercises the same alarm controller used by the sketch, including settling, two-of-five detection, single-spike rejection, latching, acknowledgment, sensitivity bounds, and clock rollover. Python tests cover both telemetry formats, controls/acknowledgments, stale readings, request validation, and recordings. These checks supplement the physical test above.
+The C++ test exercises the same alarm controller used by the sketch, including settling, two-of-five detection, single-spike rejection, latching, acknowledgment, sensitivity bounds, and clock rollover. Python tests cover both telemetry formats, controls/acknowledgments, stale readings, request validation, recordings, notification opt-in, alarm deduplication, retries, failures, queue expiry, and nonblocking sensor reading. Notification tests mock the service and send no real messages. These checks supplement physical testing.

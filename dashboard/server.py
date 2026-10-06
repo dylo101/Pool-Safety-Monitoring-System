@@ -24,6 +24,7 @@ import ipaddress
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from log_sensors import Parser, FIELDS, reading_row
+from notifications import Notifications
 
 
 class ControlError(Exception):
@@ -46,7 +47,7 @@ class Command:
 
 
 class Monitor:
-    def __init__(self, port, host=None):
+    def __init__(self, port, host=None, notifications=None):
         self.port = port
         self.host = host
         self.lock = threading.RLock()
@@ -65,6 +66,7 @@ class Monitor:
         self.commands = queue.Queue()
         self.control_lock = threading.Lock()
         self.pending_command = None
+        self.notifications = notifications
 
     def control(self, action, value=None):
         if action not in ('arm', 'disarm', 'acknowledge', 'threshold'):
@@ -164,6 +166,8 @@ class Monitor:
                 self.events.append(dict(time=row['time'], state=row['state'],
                                         motion_score=row['motion_score'],
                                         motion_threshold=row['motion_threshold']))
+            if self.notifications and status and status.get('protocol_version') == 2:
+                self.notifications.observe(row['state'], row['time'])
             if status and status['temperature_f'] is None:
                 self.temperature = None
                 self.temperature_time = 0
@@ -187,6 +191,7 @@ class Monitor:
                         recording=self.record_file is not None, filename=self.record_name,
                         count=self.record_count, port=self.port,
                         device=self.device_status, events=list(self.events),
+                        notifications=self.notifications.snapshot() if self.notifications else None,
                         transport='Wi-Fi' if self.host else 'USB')
 
     def run_wifi(self):
@@ -292,9 +297,27 @@ def handler_for(monitor):
             # Custom header and no CORS prevent another website starting recordings.
             if self.headers.get('X-Pool-Dashboard') != '1':
                 return self.reply(403, {'error': 'Dashboard requests only'})
-            if self.path not in ('/api/record/start', '/api/record/stop', '/api/control'):
+            if self.path not in ('/api/record/start', '/api/record/stop', '/api/control',
+                                 '/api/notifications/setup', '/api/notifications/enable',
+                                 '/api/notifications/test'):
                 return self.reply(404, {'error': 'Not found'})
             try:
+                if self.path.startswith('/api/notifications/'):
+                    if not monitor.notifications:
+                        return self.reply(503, {'error': 'Restart the updated dashboard to enable phone setup'})
+                    if self.path.endswith('/setup'):
+                        return self.reply(200, monitor.notifications.prepare())
+                    if self.path.endswith('/test'):
+                        monitor.notifications.test()
+                    else:
+                        length = int(self.headers.get('Content-Length', '0'))
+                        if not 0 < length <= 1024:
+                            return self.reply(400, {'error': 'Invalid request size'})
+                        body = json.loads(self.rfile.read(length))
+                        if not isinstance(body, dict):
+                            return self.reply(400, {'error': 'Invalid notification setting'})
+                        monitor.notifications.set_enabled(body.get('enabled'))
+                    return self.reply(200, monitor.snapshot())
                 if self.path == '/api/control':
                     length = int(self.headers.get('Content-Length', '0'))
                     if not 0 < length <= 1024:
@@ -325,8 +348,10 @@ def main():
             ipaddress.IPv4Address(args.esp32)
         except ValueError:
             parser.error('--esp32 must be an IPv4 address')
-    monitor = Monitor(args.port, args.esp32)
+    notifications = Notifications(Path(__file__).with_name('notification_settings.json'))
+    monitor = Monitor(args.port, args.esp32, notifications)
     server = ThreadingHTTPServer(('127.0.0.1', args.http_port), handler_for(monitor))
+    notifications.start()
     worker = threading.Thread(target=monitor.run_wifi if args.esp32 else monitor.run, daemon=True)
     worker.start()
     def interrupt(*unused):
@@ -341,6 +366,7 @@ def main():
         monitor.stop.set()
         worker.join(3)
         monitor.recording(False)
+        notifications.close()
         server.server_close()
 
 

@@ -16,14 +16,28 @@
 <p class="sub">Lower threshold = more sensitive. Change it while disarmed. An alarm requires two of the last five readings above the threshold.</p>
 <p id="control-note" role="status">Waiting for the device. Arming includes a 10-second settling period.</p>
 </section>
+<section class="chart" aria-label="Phone notifications"><h2>Phone notifications</h2>
+<p class="sub">Send activity alarms to your iPhone through ntfy. Keep this Mac awake, online, and running the dashboard.</p>
+<div class="actions"><button id="phone-setup" class="secondary">Open phone setup</button><button id="phone-enable" disabled>Enable alarm notifications</button><button id="phone-test" class="secondary" disabled>Send test notification</button></div>
+<p id="phone-status" role="status">Loading notification settings…</p>
+<p id="phone-result" class="sub" role="status"></p>
+<div id="phone-instructions" hidden>
+<ol class="events"><li>Install <a href="https://apps.apple.com/us/app/ntfy/id1625396347" target="_blank" rel="noopener noreferrer">ntfy for iPhone</a> and allow notifications.</li>
+<li>In ntfy, add a subscription using the default server <strong>https://ntfy.sh</strong> and this topic:</li></ol>
+<div class="sensitivity"><label for="phone-topic">Your topic</label><input id="phone-topic" readonly style="width:min(100%,430px)"><button id="phone-copy" class="secondary">Copy topic</button></div>
+<p class="sub">Keep this topic out of screenshots and public demos. Anyone who knows it can read or send messages on this channel.</p>
+<p class="sub">Once subscribed, send a test and check your phone. Then enable alarm notifications. Close ntfy or lock the phone to test push delivery.</p>
+<button id="phone-hide" class="secondary">Hide setup</button>
+</div></section>
 <div class="toolbar"><div><button id="record" type="button" disabled>Start recording</button><p class="sub" id="record-info" aria-live="polite">Recordings are saved in the project's logs folder.</p></div><label>History <select id="window"><option value="60">Last minute</option><option value="300">Last 5 minutes</option></select></label></div>
 <section class="chart"><h2>Motion & alarms</h2><div class="legend">Shaded bands: alarm active · Dashed line: movement threshold</div><svg id="motion-chart" role="img" aria-label="Motion score over time with alarm periods"></svg></section>
 <section class="chart"><h2>Probe temperature</h2><svg id="temperature-chart" role="img" aria-label="Temperature in Fahrenheit over time"></svg></section>
 <section class="chart"><h2>Recent monitoring events</h2><p class="sub">This dashboard session · Up to 100 state changes. Record a CSV to keep readings.</p><ol id="events" class="events"><li>No monitoring events yet.</li></ol></section>
-<footer>Times are when this computer receives readings. A lost connection means monitoring status is unavailable. Prototype tested in a water tank; pool-scale detection and remote phone notifications are not yet verified or implemented.</footer>
+<footer>Times are when this computer receives readings. A lost connection means monitoring status is unavailable. Phone delivery depends on this Mac, internet access, and ntfy; service acceptance does not confirm phone receipt. Prototype tested in a water tank; full-size pool detection remains unverified.</footer>
 </main><script>
 const $=id=>document.getElementById(id);
 let latest=null,recording=false,busy=false,controlBusy=false,thresholdDirty=false,controlMessage='',controlFailed=false,controlMessageTime=0;
+let phoneBusy=false,phoneError='';
 const names={DISARMED:'Disarmed',ARMING:'Settling',ARMED:'Armed',ALERT:'Alarm',FAULT:'Sensor fault',MOVING:'Moving (old firmware)',STILL_WAITING:'Still (old firmware)',UNKNOWN:'Unknown'};
 function svgEl(tag,attrs,text){const n=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n}
 function chart(id,key,label,color){
@@ -76,6 +90,7 @@ function render(){
   $('threshold').disabled=$('apply').disabled=controlBusy||!live||state!=='DISARMED';
   $('control-note').textContent=controlBusy?'Waiting for confirmation from the ESP32…':controlMessage||'Arming includes a 10-second settling period. Acknowledgment leaves monitoring disarmed.';
   $('control-note').classList.toggle('error',controlFailed);
+  renderPhone();
   $('record').textContent=recording?'Stop recording':'Start recording';
   $('record').disabled=busy||(!s.connected&&!recording);
   $('record-info').textContent=s.filename?(recording?'Recording: ':'Saved: ')+s.filename+' · '+s.count+' readings':'Recordings are saved in the project’s logs folder.';
@@ -86,6 +101,29 @@ function render(){
   draw();
 }
 function draw(){chart('motion-chart','motion_score','Motion score','#007f78');chart('temperature-chart','temperature_f','Temperature (°F)','#ac540e')}
+function renderPhone(){
+  const n=latest?.notifications;
+  $('phone-setup').disabled=phoneBusy||!n;
+  $('phone-enable').disabled=phoneBusy||!n?.configured;
+  $('phone-enable').textContent=n?.enabled?'Turn off notifications':'Enable alarm notifications';
+  $('phone-test').disabled=phoneBusy||!n?.configured||n.testing;
+  $('phone-status').textContent=!n?'Restart the updated dashboard to enable phone setup.':
+    (n.enabled?'Alarm notifications enabled.':'Alarm notifications off.')+(n.pending?' '+n.pending+' notification(s) pending.':'')+
+    (n.enabled&&!latest.connected?' No live device readings; new alarms cannot be observed.':'')+
+    (n.enabled&&latest.connected&&latest.device?.protocol_version!==2?' Upload the activity-alarm firmware to send activity alerts.':'');
+  $('phone-result').textContent=phoneError||n?.error||n?.last_result||'No phone notification has been sent in this session.';
+  $('phone-result').style.color=phoneError||n?.error?'#a43820':'';
+}
+async function phoneRequest(action,body){
+  phoneBusy=true;phoneError='';renderPhone();
+  try{
+    const response=await fetch('/api/notifications/'+action,{method:'POST',headers:{'X-Pool-Dashboard':'1','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(4000)});
+    const result=await response.json();if(!response.ok)throw Error(result.error||'Notification request failed');
+    if(action==='setup'){$('phone-topic').value=result.topic;$('phone-instructions').hidden=false}
+    else latest=result;
+  }catch(error){phoneError=error.message}
+  finally{phoneBusy=false;renderPhone()}
+}
 async function control(action){
   if(action==='threshold'&&!$('threshold').reportValidity())return;
   controlBusy=true;controlFailed=false;controlMessage='';render();
@@ -100,12 +138,17 @@ async function control(action){
 }
 async function poll(){
   try{const r=await fetch('/api/status',{signal:AbortSignal.timeout(3000)});if(!r.ok)throw Error('Server unavailable');latest=await r.json();render()}
-  catch(e){$('connection').textContent='Dashboard disconnected';$('connection').classList.remove('live');$('state').textContent='Unavailable';$('state-card').classList.remove('alert');$('motion').textContent=$('temperature').textContent='—';$('record').disabled=true;disableControls();$('notice').textContent='The dashboard server is unavailable. Restart it in Terminal.'}
+  catch(e){$('connection').textContent='Dashboard disconnected';$('connection').classList.remove('live');$('state').textContent='Unavailable';$('state-card').classList.remove('alert');$('motion').textContent=$('temperature').textContent='—';$('record').disabled=true;disableControls();for(const id of ['phone-setup','phone-enable','phone-test'])$(id).disabled=true;$('phone-status').textContent='Dashboard disconnected; notification status is unknown.';$('notice').textContent='The dashboard server is unavailable. Restart it in Terminal.'}
   finally{setTimeout(poll,500)}
 }
 for(const action of ['arm','disarm','acknowledge'])$(action).onclick=()=>control(action);
 $('apply').onclick=()=>control('threshold');
 $('threshold').oninput=()=>{thresholdDirty=true};
+$('phone-setup').onclick=()=>phoneRequest('setup');
+$('phone-enable').onclick=()=>phoneRequest('enable',{enabled:!latest?.notifications?.enabled});
+$('phone-test').onclick=()=>phoneRequest('test');
+$('phone-hide').onclick=()=>{$('phone-instructions').hidden=true;$('phone-topic').value=''};
+$('phone-copy').onclick=async()=>{try{await navigator.clipboard.writeText($('phone-topic').value);$('phone-copy').textContent='Copied';setTimeout(()=>{$('phone-copy').textContent='Copy topic'},2000)}catch(error){$('phone-topic').select();phoneError='Select the topic and press Command+C to copy it.';renderPhone()}};
 $('record').onclick=async()=>{busy=true;render();try{const r=await fetch('/api/record/'+(recording?'stop':'start'),{method:'POST',headers:{'X-Pool-Dashboard':'1'},signal:AbortSignal.timeout(3000)});const s=await r.json();if(!r.ok)throw Error(s.error);latest=s}catch(e){alert('Recording could not be changed: '+e.message)}finally{busy=false;render()}};
 $('window').onchange=draw;new ResizeObserver(draw).observe($('motion-chart').parentElement);poll();
 </script></body></html>
