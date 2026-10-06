@@ -64,11 +64,11 @@ void updateTemperature() {
   if (temperatureC == DEVICE_DISCONNECTED_C) {
     Serial.println("Temperature sensor not detected. Check DAT, VCC and GND.");
   } else {
-    //Serial.print("Probe Temperature: ");
-    //Serial.print(temperatureC, 2);
-    //Serial.print(" C / ");
-    //Serial.print(DallasTemperature::toFahrenheit(temperatureC), 2);
-    //Serial.println(" F");
+    Serial.print("Probe Temperature: ");
+    Serial.print(temperatureC, 2);
+    Serial.print(" C / ");
+    Serial.print(DallasTemperature::toFahrenheit(temperatureC), 2);
+    Serial.println(" F");
   }
 
   temperatureSensor.requestTemperatures();
@@ -156,14 +156,14 @@ void loop() {
   previousY = accel.acceleration.y;
   previousZ = accel.acceleration.z;
 
-  //Serial.print("Motion Score: ");
-  //Serial.println(motion);
+  Serial.print("Motion Score: ");
+  Serial.println(motion);
 
   // MOVING
   if (motion > 0.5) {
     latestState = "MOVING";
 
-    //Serial.println("MOVING");
+    Serial.println("MOVING");
 
     // Reset stillness timer
     stillTimerRunning = false;
@@ -179,7 +179,7 @@ void loop() {
   // STILL
   else {
 
-    //Serial.println("STILL");
+    Serial.println("STILL");
 
     // Start the stillness timer
     if (!stillTimerRunning) {
@@ -201,7 +201,7 @@ void loop() {
       digitalWrite(buzzer, HIGH);
 
 
-      //Serial.println("!!! STILL TOO LONG !!!");
+      Serial.println("!!! STILL TOO LONG !!!");
 
     } else {
       latestState = "STILL_WAITING";
