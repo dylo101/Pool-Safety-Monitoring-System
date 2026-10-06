@@ -1,34 +1,111 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pool Monitor</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pool Activity Monitor</title>
 <style>
-:root{color-scheme:light;--ink:#18343c;--muted:#536c73;--line:#dae5e6;--teal:#007f78;--orange:#ac540e}*{box-sizing:border-box}body{margin:0;background:#f3f7f6;color:var(--ink);font:16px system-ui,sans-serif}main{max-width:1100px;margin:auto;padding:32px 24px}header,.toolbar{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}h1{font-size:30px;letter-spacing:-1px;margin:4px 0}h2{font-size:17px;margin:0 0 12px}p{color:var(--muted);margin:8px 0}.eyebrow{font-size:12px;letter-spacing:2px;text-transform:uppercase}.connection{padding:9px 14px;border:1px solid var(--line);border-radius:30px;background:white;font-size:14px}.connection.live{color:var(--teal)}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:28px 0 18px}.card,.chart{background:white;border:1px solid var(--line);border-radius:16px;padding:22px}.label{font-size:14px;color:var(--muted)}.value{font-size:32px;font-weight:650;margin:12px 0 6px;font-variant-numeric:tabular-nums}.card.alert{background:#fff1e9;border-color:#dc8b54}.sub{font-size:13px;color:var(--muted)}.chart{margin:16px 0}.chart svg{display:block;width:100%;height:220px}svg text{font-size:12px;fill:var(--muted)}.toolbar{margin:24px 0 16px}button{border:0;background:var(--ink);color:white;border-radius:9px;padding:12px 18px;font:inherit;cursor:pointer}button:disabled{opacity:.5;cursor:default}button:focus-visible,select:focus-visible{outline:3px solid var(--teal);outline-offset:3px}select{font:inherit;border:1px solid var(--line);padding:8px;border-radius:8px;background:white}#notice{min-height:24px;font-size:14px}#record-info{overflow-wrap:anywhere}footer{font-size:13px;color:var(--muted);margin-top:24px}.legend{font-size:13px;color:var(--muted)}@media(max-width:650px){main{padding:20px 14px}.cards{grid-template-columns:1fr;gap:10px}.card{padding:16px}.value{font-size:27px}.chart{padding:12px}h1{font-size:26px}}
+:root{color-scheme:light;--ink:#18343c;--muted:#536c73;--line:#dae5e6;--teal:#007f78;--orange:#ac540e}*{box-sizing:border-box}body{margin:0;background:#f3f7f6;color:var(--ink);font:16px system-ui,sans-serif}main{max-width:1100px;margin:auto;padding:32px 24px}header,.toolbar,.controls{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}h1{font-size:30px;letter-spacing:-1px;margin:4px 0}h2{font-size:17px;margin:0 0 12px}p{color:var(--muted);margin:8px 0}.eyebrow{font-size:12px;letter-spacing:2px;text-transform:uppercase}.connection{padding:9px 14px;border:1px solid var(--line);border-radius:30px;background:white;font-size:14px}.connection.live{color:var(--teal)}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:28px 0 18px}.card,.chart,.control-panel{background:white;border:1px solid var(--line);border-radius:16px;padding:22px}.label{font-size:14px;color:var(--muted)}.value{font-size:32px;font-weight:650;margin:12px 0 6px;font-variant-numeric:tabular-nums}.card.alert{background:#fff1e9;border-color:#dc8b54}.sub{font-size:13px;color:var(--muted)}.chart{margin:16px 0}.chart svg{display:block;width:100%;height:220px}svg text{font-size:12px;fill:var(--muted)}.toolbar{margin:24px 0 16px}button{border:0;background:var(--ink);color:white;border-radius:9px;padding:12px 18px;font:inherit;cursor:pointer}button.secondary{background:#e7eeee;color:var(--ink)}button.ack{background:var(--orange)}button:disabled,input:disabled{opacity:.5;cursor:default}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--teal);outline-offset:3px}select,input{font:inherit;border:1px solid var(--line);padding:8px;border-radius:8px;background:white}input{width:100px}.actions{display:flex;gap:10px;flex-wrap:wrap}.sensitivity{display:flex;gap:10px;align-items:center;flex-wrap:wrap}#notice,#control-note{min-height:24px;font-size:14px}#control-note.error{color:#a43820}#record-info{overflow-wrap:anywhere}footer{font-size:13px;color:var(--muted);margin-top:24px}.legend{font-size:13px;color:var(--muted)}.events{padding-left:22px}.events li{margin:8px 0;font-size:14px}@media(max-width:650px){main{padding:20px 14px}.cards{grid-template-columns:1fr;gap:10px}.card{padding:16px}.value{font-size:27px}.chart{padding:12px}h1{font-size:26px}}
 </style></head><body><main>
-<header><div><div class="eyebrow">Bench prototype · Live sensors</div><h1>Pool Monitor</h1><p>Motion, temperature, and alerts in one place.</p></div><div class="connection" id="connection" role="status">Connecting…</div></header>
+<header><div><div class="eyebrow">Water disturbance prototype</div><h1>Pool Activity Monitor</h1><p>Arm when the water should be undisturbed.</p></div><div class="connection" id="connection" role="status">Connecting…</div></header>
 <div id="notice" role="status"></div>
 <section class="cards" aria-label="Current readings">
-<div class="card" id="state-card"><div class="label">System status</div><div class="value" id="state">Waiting</div><div class="sub" id="state-note">Waiting for your ESP32</div></div>
+<div class="card" id="state-card"><div class="label">Monitoring status</div><div class="value" id="state">Waiting</div><div class="sub" id="state-note">Waiting for your ESP32</div></div>
 <div class="card"><div class="label">Probe temperature</div><div class="value" id="temperature">—</div><div class="sub">Latest reading · Fahrenheit</div></div>
-<div class="card"><div class="label">Motion score</div><div class="value" id="motion">—</div><div class="sub">Movement threshold: above 0.5</div></div>
+<div class="card"><div class="label">Motion score</div><div class="value" id="motion">—</div><div class="sub" id="threshold-note">Waiting for sensitivity setting</div></div>
+</section>
+<section class="control-panel" aria-label="Alarm controls"><h2>Monitoring controls</h2>
+<div class="controls"><div class="actions"><button id="arm" disabled>Arm monitoring</button><button id="disarm" class="secondary" disabled>Disarm</button><button id="acknowledge" class="ack" disabled>Acknowledge alarm</button></div>
+<div class="sensitivity"><label for="threshold">Movement threshold</label><input id="threshold" type="number" min="0.1" max="20" step="0.01" value="0.50" disabled><button id="apply" class="secondary" disabled>Apply</button></div></div>
+<p class="sub">Lower threshold = more sensitive. Change it while disarmed. An alarm requires two of the last five readings above the threshold.</p>
+<p id="control-note" role="status">Waiting for the device. Arming includes a 10-second settling period.</p>
 </section>
 <div class="toolbar"><div><button id="record" type="button" disabled>Start recording</button><p class="sub" id="record-info" aria-live="polite">Recordings are saved in the project's logs folder.</p></div><label>History <select id="window"><option value="60">Last minute</option><option value="300">Last 5 minutes</option></select></label></div>
-<section class="chart"><h2>Motion & alerts</h2><div class="legend">Shaded bands: alert active · Dashed line: 0.5 threshold</div><svg id="motion-chart" role="img" aria-label="Motion score over time with alert periods"></svg></section>
+<section class="chart"><h2>Motion & alarms</h2><div class="legend">Shaded bands: alarm active · Dashed line: movement threshold</div><svg id="motion-chart" role="img" aria-label="Motion score over time with alarm periods"></svg></section>
 <section class="chart"><h2>Probe temperature</h2><svg id="temperature-chart" role="img" aria-label="Temperature in Fahrenheit over time"></svg></section>
-<footer>Local receive times. A disconnected or stale connection is never shown as a current sensor state. This bench prototype has not been validated for swimmer safety.</footer>
+<section class="chart"><h2>Recent monitoring events</h2><p class="sub">This dashboard session · Up to 100 state changes. Record a CSV to keep readings.</p><ol id="events" class="events"><li>No monitoring events yet.</li></ol></section>
+<footer>Times are when this computer receives readings. A lost connection means monitoring status is unavailable. Prototype tested in a water tank; pool-scale detection and remote phone notifications are not yet verified or implemented.</footer>
 </main><script>
-const $=id=>document.getElementById(id);let latest=null,recording=false,busy=false;
-const names={MOVING:'Moving',STILL_WAITING:'Still · waiting',ALERT:'Alert',UNKNOWN:'Unknown'};
+const $=id=>document.getElementById(id);
+let latest=null,recording=false,busy=false,controlBusy=false,thresholdDirty=false,controlMessage='',controlFailed=false,controlMessageTime=0;
+const names={DISARMED:'Disarmed',ARMING:'Settling',ARMED:'Armed',ALERT:'Alarm',FAULT:'Sensor fault',MOVING:'Moving (old firmware)',STILL_WAITING:'Still (old firmware)',UNKNOWN:'Unknown'};
 function svgEl(tag,attrs,text){const n=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n}
-function chart(id,key,label,color){const svg=$(id),w=svg.clientWidth,h=220,L=58,R=w-16,T=30,B=175;svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.replaceChildren();const seconds=+$('window').value,now=Date.now(),start=now-seconds*1000;
-const all=(latest?.rows||[]).map(r=>({...r,t:Date.parse(r.time)}));const rows=all.filter(r=>r.t>=start);const vals=rows.filter(r=>r[key]!==''&&Number.isFinite(+r[key]));const x=t=>L+(t-start)/(seconds*1000)*(R-L);
-let low=key==='motion_score'?0:Math.min(...vals.map(r=>+r[key])),high=key==='motion_score'?Math.max(.6,...vals.map(r=>+r[key])):Math.max(...vals.map(r=>+r[key]));if(!vals.length){low=0;high=1}const pad=Math.max((high-low)*.1,key==='motion_score'?.05:.5);low=key==='motion_score'?0:low-pad;high+=pad;const y=v=>B-(v-low)/(high-low)*(B-T);
-svg.append(svgEl('text',{x:L,y:16},label));for(let i=0;i<=4;i++){const v=low+(high-low)*i/4,yy=y(v);svg.append(svgEl('line',{x1:L,x2:R,y1:yy,y2:yy,stroke:'#e3ebec'}),svgEl('text',{x:L-8,y:yy+4,'text-anchor':'end'},v.toFixed(1)))}
-for(let i=0;i<=3;i++){const t=start+seconds*1000*i/3;svg.append(svgEl('text',{x:x(t),y:B+22,'text-anchor':i===0?'start':i===3?'end':'middle'},new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})))}
-if(key==='motion_score'){rows.forEach((r,i)=>{if(r.state==='ALERT'){const end=Math.min(rows[i+1]?.t??r.t+220,r.t+1000,now);svg.append(svgEl('rect',{x:x(r.t),y:T,width:Math.max(1,x(end)-x(r.t)),height:B-T,fill:'#f1b98e',opacity:.5}))}});svg.append(svgEl('line',{x1:L,x2:R,y1:y(.5),y2:y(.5),stroke:'#80694f','stroke-dasharray':'5 4'}))}
-let path='',prev=null;vals.forEach(r=>{path+=(prev&&r.t-prev.t<(key==='motion_score'?1500:3000)?'L':'M')+x(r.t)+','+y(+r[key]);prev=r});svg.append(svgEl('path',{d:path,fill:'none',stroke:color,'stroke-width':2}));if(!vals.length)svg.append(svgEl('text',{x:(L+R)/2,y:100,'text-anchor':'middle'},'Waiting for readings'));
-svg.append(svgEl('text',{x:(L+R)/2,y:216,'text-anchor':'middle'},'Local time'));
+function chart(id,key,label,color){
+  const svg=$(id),w=svg.clientWidth,h=220,L=58,R=w-16,T=30,B=175;
+  if(w<100)return;
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.replaceChildren();
+  const seconds=+$('window').value,now=Date.now(),start=now-seconds*1000;
+  const rows=(latest?.rows||[]).map(r=>({...r,t:Date.parse(r.time)})).filter(r=>r.t>=start);
+  const vals=rows.filter(r=>r[key]!==''&&Number.isFinite(+r[key])),x=t=>L+(t-start)/(seconds*1000)*(R-L);
+  const currentThreshold=latest?.device?.motion_threshold??.5;
+  let low=key==='motion_score'?0:Math.min(...vals.map(r=>+r[key]));
+  let high=key==='motion_score'?Math.max(currentThreshold,.6,...vals.map(r=>+r[key]),...rows.map(r=>Number(r.motion_threshold)||.5)):Math.max(...vals.map(r=>+r[key]));
+  if(!vals.length){low=0;high=key==='motion_score'?Math.max(1,currentThreshold):1}
+  const pad=Math.max((high-low)*.1,key==='motion_score'?.05:.5);low=key==='motion_score'?0:low-pad;high+=pad;
+  const y=v=>B-(v-low)/(high-low)*(B-T);
+  svg.append(svgEl('text',{x:L,y:16},label));
+  for(let i=0;i<=4;i++){const v=low+(high-low)*i/4,yy=y(v);svg.append(svgEl('line',{x1:L,x2:R,y1:yy,y2:yy,stroke:'#e3ebec'}),svgEl('text',{x:L-8,y:yy+4,'text-anchor':'end'},v.toFixed(1)))}
+  for(let i=0;i<=3;i++){const t=start+seconds*1000*i/3;svg.append(svgEl('text',{x:x(t),y:B+22,'text-anchor':i===0?'start':i===3?'end':'middle'},new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})))}
+  if(key==='motion_score'){
+    rows.forEach((r,i)=>{if(r.state==='ALERT'){const end=Math.min(rows[i+1]?.t??r.t+220,r.t+1000,now);svg.append(svgEl('rect',{x:x(r.t),y:T,width:Math.max(1,x(end)-x(r.t)),height:B-T,fill:'#f1b98e',opacity:.5}))}});
+    let thresholdPath='',prev=null;
+    rows.forEach(r=>{const v=Number(r.motion_threshold)||.5;thresholdPath+=(prev&&r.t-prev.t<1500?'L':'M')+x(r.t)+','+y(v);prev=r});
+    svg.append(svgEl('path',{d:thresholdPath,fill:'none',stroke:'#80694f','stroke-dasharray':'5 4'}));
+  }
+  let path='',prev=null;vals.forEach(r=>{path+=(prev&&r.t-prev.t<(key==='motion_score'?1500:3000)?'L':'M')+x(r.t)+','+y(+r[key]);prev=r});
+  svg.append(svgEl('path',{d:path,fill:'none',stroke:color,'stroke-width':2}));
+  if(!vals.length)svg.append(svgEl('text',{x:(L+R)/2,y:100,'text-anchor':'middle'},'Waiting for readings'));
+  svg.append(svgEl('text',{x:(L+R)/2,y:216,'text-anchor':'middle'},'Local time'));
 }
-function render(){if(!latest)return;const s=latest,r=s.rows.at(-1);recording=s.recording;$('connection').textContent=s.connected?(s.transport||'USB')+' connected':'No live readings';$('connection').classList.toggle('live',s.connected);$('notice').textContent=s.error||(!s.connected?'Check USB and close Serial Monitor or the separate logger.':'');$('state').textContent=s.connected?(names[r?.state]||'Unknown'):'Unavailable';$('state-card').classList.toggle('alert',s.connected&&r?.state==='ALERT');$('state-note').textContent=s.connected?(r?.state==='ALERT'?'Stillness limit reached':r?.state==='MOVING'?'Alert cleared; timer reset':'Alert after 15 seconds of stillness'):'Historical graphs remain below';$('motion').textContent=s.connected?Number(r.motion_score).toFixed(2):'—';$('temperature').textContent=s.connected&&s.temperature!==null?s.temperature.toFixed(1)+' °F':'—';$('record').textContent=recording?'Stop recording':'Start recording';$('record').disabled=busy||(!s.connected&&!recording);$('record-info').textContent=s.filename?`${recording?'Recording':'Saved'}: ${s.filename} · ${s.count} readings`:'Recordings are saved in the project’s logs folder.';draw();}
+function disableControls(){for(const id of ['arm','disarm','acknowledge','apply','threshold'])$(id).disabled=true}
+function render(){
+  if(!latest)return;
+  if(!controlFailed&&Date.now()-controlMessageTime>5000)controlMessage='';
+  const s=latest,r=s.rows.at(-1),d=s.device,state=r?.state,v2=d?.protocol_version===2,live=s.connected&&v2;
+  recording=s.recording;
+  $('connection').textContent=s.connected?(s.transport||'USB')+' connected':'No live readings';
+  $('connection').classList.toggle('live',s.connected);
+  $('notice').textContent=s.error||(!s.connected?'Check device power and the selected USB or Wi-Fi connection.':!v2?'Upload the activity-alarm sketch to enable monitoring controls.':'');
+  $('state').textContent=s.connected?(state==='ALERT'&&!v2?'Stillness alert (old firmware)':names[state]||'Unknown'):'Unavailable';
+  $('state-card').classList.toggle('alert',s.connected&&(state==='ALERT'||state==='FAULT'));
+  const notes={DISARMED:'Readings continue; activity alarms are off.',ARMING:'Let the water settle: '+Math.ceil((d?.arming_remaining_ms||0)/1000)+' seconds remaining.',ARMED:'Watching for unexpected water disturbances.',ALERT:'Check the water. Acknowledge to silence and disarm.'+(d?.sensor_ok===false?' Motion sensor also unavailable.':''),FAULT:'Check sensor wiring with power off, then reset the ESP32.'};
+  $('state-note').textContent=s.connected?(v2?notes[state]:'The previous stillness alarm is still running.'):'Historical graphs remain below; current state is unknown.';
+  $('motion').textContent=s.connected&&r?Number(r.motion_score).toFixed(2):'—';
+  $('temperature').textContent=s.connected&&s.temperature!==null?s.temperature.toFixed(1)+' °F':'—';
+  $('threshold-note').textContent=s.connected&&v2?'Device threshold: '+d.motion_threshold.toFixed(2):'Device threshold unavailable';
+  if(live&&!thresholdDirty&&document.activeElement!==$('threshold'))$('threshold').value=d.motion_threshold.toFixed(2);
+  $('arm').disabled=controlBusy||!live||state!=='DISARMED';
+  $('disarm').disabled=controlBusy||!live||!['ARMING','ARMED'].includes(state);
+  $('acknowledge').disabled=controlBusy||!live||state!=='ALERT';
+  $('threshold').disabled=$('apply').disabled=controlBusy||!live||state!=='DISARMED';
+  $('control-note').textContent=controlBusy?'Waiting for confirmation from the ESP32…':controlMessage||'Arming includes a 10-second settling period. Acknowledgment leaves monitoring disarmed.';
+  $('control-note').classList.toggle('error',controlFailed);
+  $('record').textContent=recording?'Stop recording':'Start recording';
+  $('record').disabled=busy||(!s.connected&&!recording);
+  $('record-info').textContent=s.filename?(recording?'Recording: ':'Saved: ')+s.filename+' · '+s.count+' readings':'Recordings are saved in the project’s logs folder.';
+  $('events').replaceChildren();
+  const events=(s.events||[]).slice().reverse();
+  if(!events.length){const li=document.createElement('li');li.textContent='No monitoring events yet.';$('events').append(li)}
+  for(const event of events){const li=document.createElement('li');li.textContent=new Date(event.time).toLocaleTimeString()+' — '+(names[event.state]||event.state)+(event.state==='ALERT'?' · Motion '+Number(event.motion_score).toFixed(2):'');$('events').append(li)}
+  draw();
+}
 function draw(){chart('motion-chart','motion_score','Motion score','#007f78');chart('temperature-chart','temperature_f','Temperature (°F)','#ac540e')}
-async function poll(){try{const r=await fetch('/api/status',{signal:AbortSignal.timeout(3000)});if(!r.ok)throw Error('Server unavailable');latest=await r.json();render()}catch(e){$('connection').textContent='Dashboard disconnected';$('state').textContent='Unavailable';$('state-card').classList.remove('alert');$('motion').textContent=$('temperature').textContent='—';$('record').disabled=true;$('notice').textContent='The dashboard server is unavailable. Restart it in Terminal.'}finally{setTimeout(poll,500)}}
-$('record').onclick=async()=>{busy=true;render();try{const r=await fetch('/api/record/'+(recording?'stop':'start'),{method:'POST',headers:{'X-Pool-Dashboard':'1'},signal:AbortSignal.timeout(3000)});const s=await r.json();if(!r.ok)throw Error(s.error);latest=s}catch(e){alert('Recording could not be changed: '+e.message)}finally{busy=false;render()}};$('window').onchange=draw;new ResizeObserver(draw).observe($('motion-chart').parentElement);poll();
+async function control(action){
+  if(action==='threshold'&&!$('threshold').reportValidity())return;
+  controlBusy=true;controlFailed=false;controlMessage='';render();
+  try{
+    const body={action};if(action==='threshold')body.value=Number($('threshold').value);
+    const response=await fetch('/api/control',{method:'POST',headers:{'X-Pool-Dashboard':'1','Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(7000)});
+    const result=await response.json();if(!response.ok)throw Error(result.error||'Control request failed');
+    latest=result;if(action==='threshold')thresholdDirty=false;
+    controlMessage={arm:'Arming confirmed. Allow the water to settle.',disarm:'Disarmed by the device.',acknowledge:'Alarm acknowledged. Monitoring is disarmed.',threshold:'Sensitivity confirmed by the device.'}[action];controlMessageTime=Date.now();
+  }catch(error){controlFailed=true;controlMessage=error.message}
+  finally{controlBusy=false;render()}
+}
+async function poll(){
+  try{const r=await fetch('/api/status',{signal:AbortSignal.timeout(3000)});if(!r.ok)throw Error('Server unavailable');latest=await r.json();render()}
+  catch(e){$('connection').textContent='Dashboard disconnected';$('connection').classList.remove('live');$('state').textContent='Unavailable';$('state-card').classList.remove('alert');$('motion').textContent=$('temperature').textContent='—';$('record').disabled=true;disableControls();$('notice').textContent='The dashboard server is unavailable. Restart it in Terminal.'}
+  finally{setTimeout(poll,500)}
+}
+for(const action of ['arm','disarm','acknowledge'])$(action).onclick=()=>control(action);
+$('apply').onclick=()=>control('threshold');
+$('threshold').oninput=()=>{thresholdDirty=true};
+$('record').onclick=async()=>{busy=true;render();try{const r=await fetch('/api/record/'+(recording?'stop':'start'),{method:'POST',headers:{'X-Pool-Dashboard':'1'},signal:AbortSignal.timeout(3000)});const s=await r.json();if(!r.ok)throw Error(s.error);latest=s}catch(e){alert('Recording could not be changed: '+e.message)}finally{busy=false;render()}};
+$('window').onchange=draw;new ResizeObserver(draw).observe($('motion-chart').parentElement);poll();
 </script></body></html>

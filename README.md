@@ -1,10 +1,10 @@
-# Pool Safety Monitoring System
+# IoT Pool Activity Monitoring Prototype
 
-An ESP32 breadboard prototype that monitors motion with an MPU6050, signals prolonged stillness with LEDs and a buzzer, and reports DS18B20 probe temperatures over USB serial.
+An ESP32 prototype that measures movement of a float-mounted MPU6050 and alerts on unexpected water disturbances while armed. It includes local LEDs and a buzzer, a USB/Wi-Fi dashboard, adjustable sensitivity, CSV recording, and a DS18B20 temperature probe.
 
 ## Current status
 
-The motion sensor, LEDs, buzzer, and temperature probe have been tested together and confirmed working on the bench. This demonstrates sensor and alert operation; it does not establish that the prototype can detect drowning or reliably monitor a swimmer.
+The sensors and previous stillness-alert firmware were tested on the bench. The float assembly has now been tested in a water tank, with distinct recordings for calm water, small ripples, and larger disturbances. The activity-alarm firmware and dashboard controls are implemented and software-tested; they still require uploading and physical verification. Full-size pool testing and internet-based phone notifications remain future work. This portfolio prototype detects device movement; it does not establish a swimmer's safety or detect drowning.
 
 ## How it works
 
@@ -16,15 +16,35 @@ motion = |X - previousX| + |Y - previousY| + |Z - previousZ|
 
 The first reading is ignored for motion scoring. The loop includes a 200 ms delay, so readings occur approximately five times per second.
 
-| Condition | Green LED | Red LED | Buzzer |
+| Monitoring state | Green LED | Red LED | Buzzer |
 |---|---|---|---|
-| Motion score greater than 0.5 | On | Off | Off |
-| Stillness for less than 15 seconds | On | Off | Off |
-| Stillness for 15 seconds or longer | Off | On | On |
+| Disarmed (including power-up/reset) | Off | Off | Off |
+| Arming: 10-second settling period | Blinking | Off | Off |
+| Armed | On | Off | Off |
+| Activity alarm | Off | On | On |
+| Motion sensor fault | Off | On | Off, unless an activity alarm was already latched |
 
-Any motion score above **0.5** resets the stillness timer and clears an active alert. These are the current tested settings; older project notes mention a different threshold.
+After the settling period, **two of the last five readings strictly above the threshold** trigger an alarm. The default threshold is **0.50**; change it from **0.10 to 20.00** while disarmed. Lower values are more sensitive. Five readings span roughly one second at the current sample rate, but networking can add latency. A single isolated spike does not trigger the alarm. The alarm remains latched regardless of subsequent movement or stillness. **Acknowledge alarm** silences it and leaves the device disarmed; explicitly arm again to resume monitoring. Disarming cannot bypass acknowledgment of an active alarm.
 
-The temperature probe reports Celsius and Fahrenheit approximately once per second. Temperature conversions run without waiting in the motion loop. Temperature is currently displayed only; it does not trigger alerts.
+The ESP32 owns these rules and controls its outputs independently of the dashboard or Wi-Fi. Disconnecting the dashboard does not disarm it. Power loss/reset starts it disarmed and restores the default threshold; settings are not saved across resets. A sensor fault requires checking the wiring and resetting the device. An already latched alarm remains active if the sensor subsequently fails.
+
+The temperature probe updates approximately once per second without waiting in the motion loop. Its latest Celsius/Fahrenheit values are included in each telemetry message. Temperature is informational and does not trigger alerts.
+
+## First water-tank recordings — October 5, 2026
+
+The assembled prototype places the electronics in a cup supported by a float connected to an arm through hinges. The MPU6050 must be secured so its movement follows the float rather than loose electronics. The cup is not a sealed enclosure. Tests used controlled disturbances limited to avoid wetting the electronics; larger disturbances were greater than the small-ripple test but were not representative pool-entry tests.
+
+| Test | Readings | Recorded duration | Peak motion score | Recorded scores above 0.50 |
+|---|---:|---:|---:|---:|
+| Calm water | 146 | 30.42 seconds | 0.25 | 0 |
+| Small ripples | 255 | 53.30 seconds | 0.91 | 47 |
+| Larger disturbances | 347 | 72.59 seconds | 14.40 | 199 |
+
+Sources: preserved recordings [calm.csv](output/water-tests-2026-10-05/calm.csv), [small_ripples.csv](output/water-tests-2026-10-05/small_ripples.csv), and [large_disturbances.csv](output/water-tests-2026-10-05/large_disturbances.csv). New dashboard logs are excluded from Git. Durations use computer receive timestamps. Counts are individual rounded scores, not independently labeled disturbances. A score rounded to 0.50 can have been classified as moving by the old firmware using its unrounded value.
+
+Each trial ended after the old 15-second stillness alarm activated. Both disturbance trials remained below 0.50 over their final 15 seconds. The files' `ALERT` states therefore indicate the **old stillness alarm**, not the new activity alarm. The recordings support 0.50 as an initial sensitive setting; 1.00–1.20 is a candidate for filtering these particular small ripples. They do not establish per-event detection accuracy, long-term false-alarm rates, or performance in a full-size pool.
+
+Offline replay through the new firmware's actual two-of-five controller, assuming it was already armed before each recording, produced no alarm for calm water and an alarm for both disturbance recordings at threshold 0.50. At 1.20, only the larger-disturbance recording triggered. This replay uses saved rounded scores and receive timestamps, skips the startup settling period, and checks the first latched alarm only. It is a software check, not physical verification of the new firmware or a per-disturbance accuracy measurement.
 
 ## Hardware
 
@@ -126,20 +146,19 @@ Typical startup output:
 
 ```text
 MPU6050 Ready!
-Temperature readings enabled on D4.
 ```
 
-During operation, the monitor displays motion scores, `MOVING` or `STILL`, timer/alert messages, and readings such as:
+During operation, Serial Monitor displays one JSON telemetry line per cycle, including motion, monitoring state, threshold, temperature, and control acknowledgments. USB and Wi-Fi use the same telemetry fields. For example:
 
 ```text
-Probe Temperature: 23.50 C / 74.30 F
+"state":"DISARMED","motion_threshold":0.50
 ```
 
 ## Live dashboard
 
-Wi-Fi is also supported: configure the ignored `wifi_secrets.h`, upload the sketch, and start the dashboard with `python3 dashboard/server.py --esp32 YOUR_ESP32_IP`. See [Wi-Fi setup](dashboard/README.md#wi-fi-option). USB remains the default connection. Live Wi-Fi readings were verified on September 15, 2026, using ESP32 address `192.168.254.165`. This address may change after a router or device restart. Testing Wi-Fi disconnect/reconnect and the physical alert sequence in Wi-Fi mode remains to be completed.
+Wi-Fi is supported: configure the ignored `wifi_secrets.h`, upload the sketch, and start the dashboard with `python3 dashboard/server.py --esp32 YOUR_ESP32_IP`. See [Wi-Fi setup](dashboard/README.md#wi-fi-option). USB remains the default connection. Live Wi-Fi readings and the previous local alarm were verified; dashboard recovery after interrupting the Mac's Wi-Fi was also reported successful. The ESP32's own Wi-Fi reconnection still needs physical testing. Its IP address may change after a router or device restart.
 
-The repository includes a local dashboard with current motion, alert state, temperature, live graphs, and CSV recording controls. No additional Python packages or Arduino upload are required.
+The local dashboard includes arm/disarm and acknowledgment controls, sensitivity adjustment, current readings, graphs, recent state-change events, and CSV recording. Controls require the updated activity-alarm sketch to be uploaded. The server needs no additional Python packages. Older firmware readings remain supported, with controls disabled and clearly labeled as the old firmware.
 
 Close Serial Monitor/Plotter and the standalone logger, then run:
 
@@ -165,7 +184,7 @@ cd ~/Pool-Safety-Monitoring-System
 python3 tools/log_sensors.py
 ```
 
-4. Perform a motion/stillness test or warm the temperature probe in your hand.
+4. Record a disturbance test or warm the temperature probe in your hand. The standalone logger records only; use the dashboard to arm and control the alarm.
 5. Press **Control+C** to stop recording and release the serial port.
 
 Each run creates a timestamped CSV and a raw serial text log in `logs/`. The CSV opens in Excel or another spreadsheet application. Files are flushed during recording, and new runs create new files rather than overwriting previous recordings. Generated logs are excluded from Git.
@@ -176,10 +195,11 @@ CSV columns:
 |---|---|
 | `time` | Mac/computer local receive time with timezone, not an ESP32 measurement timestamp |
 | `motion_score` | Motion score printed by the sketch |
-| `state` | `MOVING`, `STILL_WAITING`, `ALERT`, or `UNKNOWN` if the cycle's state message was missing |
-| `temperature_c`, `temperature_f` | Probe reading when printed during this cycle; blank on other cycles |
+| `state` | `DISARMED`, `ARMING`, `ARMED`, `ALERT`, or `FAULT`; old firmware retains its previous state names |
+| `temperature_c`, `temperature_f` | Latest valid probe reading; blank when unavailable (old USB firmware has blanks between updates) |
+| `motion_threshold` | Device threshold for this reading; blank for old firmware |
 
-Motion readings arrive more often than temperature readings, so blank temperature cells are normal. Missing-sensor messages are retained in the raw log and displayed in Terminal. Each row is completed when the next motion cycle begins; the last unfinished cycle is kept only in the raw log. Older buffered input is discarded at startup.
+New JSON telemetry rows are saved immediately. Old USB text-format rows complete when the next motion cycle begins; their last unfinished cycle remains only in the raw log. Buffered input is discarded at startup. The raw log retains every received serial line. Old text output remains readable by the logger.
 
 For a timed recording or a different USB port:
 
@@ -190,7 +210,7 @@ python3 tools/log_sensors.py --port /dev/cu.usbserial-0001
 
 If no readings arrive, check the USB connection, port selection, and that Serial Monitor/Plotter are closed.
 
-## Confirmed tests
+## Historical bench tests (previous firmware)
 
 - Moving the MPU6050 turns the green LED on and keeps the buzzer silent.
 - Leaving it still for approximately 15 seconds turns on the red LED and buzzer.
@@ -200,16 +220,17 @@ If no readings arrive, check the USB connection, port selection, and that Serial
 - The complete system was retested with both sensors and worked as expected.
 - The sketch compiled successfully for the generic ESP32 target (`esp32:esp32:esp32`).
 
-The hand-warming test confirms a response to temperature changes, not calibrated measurement accuracy.
+The hand-warming test confirms a response to temperature changes, not calibrated measurement accuracy. The old stillness behavior above was intentionally replaced. Upload and verify the new alarm using the [activity-alarm test procedure](dashboard/README.md#activity-alarm-test).
 
 ## Troubleshooting
 
 | Observation | First check |
 |---|---|
-| `MPU6050 not found!` | Check the motion sensor's power, ground, SDA, and SCL connections. The sketch stops here if initialization fails. |
-| `Temperature sensor not detected. Check DAT, VCC and GND.` | Check adapter DAT to D4, shared 3.3V/ground, and the probe's screw-terminal connections. |
+| Sensor fault / `MPU6050 not found!` | Unplug power, check VCC/GND/SDA/SCL, and reset after repair. The dashboard stays available but cannot arm with a sensor fault. |
+| Temperature unavailable | Check adapter DAT to D4, shared 3.3V/ground, and the probe's screw-terminal connections. |
 | Red LED turns on but buzzer is silent | With USB unplugged, check the buzzer's negative connection to GND and positive connection to D19. A missing ground caused the original issue. |
-| Stillness alert never starts | Watch the motion scores; every reading above 0.5 resets the 15-second timer. |
+| Activity alarm does not trigger | Confirm the device is armed after settling; two of the last five readings must exceed its selected threshold. |
+| Controls disabled | Upload the new sketch and verify a live connection. Sensitivity changes require disarming; active alarms require acknowledgment. |
 | Serial Monitor text is unreadable | Set the monitor to 115200 baud. |
 
 ## Files
@@ -234,5 +255,6 @@ These items are not implemented yet:
 
 - Record a complete wiring diagram, including I2C pins, LED resistor values, and the buzzer model.
 - Analyze recorded sensor logs and compare different bench tests.
-- Add Wi-Fi communication beyond the current local USB dashboard.
-- Evaluate sensor placement, enclosure design, and behavior beyond bench testing.
+- Add authenticated internet access and remote phone notifications.
+- Build a splash-protected enclosure and secure permanent connections.
+- Measure repeatable event detection and false alarms, then evaluate behavior in a full-size pool.
