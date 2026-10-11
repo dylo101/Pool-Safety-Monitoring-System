@@ -2,9 +2,17 @@
 
 An ESP32 prototype that measures movement of a float-mounted MPU6050 and alerts on unexpected water disturbances while armed. It includes local LEDs and a buzzer, a USB/Wi-Fi dashboard, adjustable sensitivity, CSV recording, and a DS18B20 temperature probe.
 
+## Demo
+
+[![Pool activity monitor demo: float assembly, dashboard, and iPhone](output/demo/pool-monitor-demo-preview.jpg)](output/demo/pool-monitor-demo-edited.mp4)
+
+**[Watch or download the 25-second demo](output/demo/pool-monitor-demo-edited.mp4)**
+
+The demo shows arming and settling, a disturbance created by moving the test tub, the dashboard alarm, an activity notification on the iPhone, and acknowledgment returning the system to Disarmed. Part of the 10-second settling period is sped up **4×**, with an on-screen indicator; the rest plays at normal speed.
+
 ## Current status
 
-The sensors and previous stillness-alert firmware were tested on the bench. The float assembly has now been tested in a water tank, with distinct recordings for calm water, small ripples, and larger disturbances. The activity-alarm firmware, dashboard controls, and optional Mac-to-phone notifications through ntfy are implemented and software-tested. The activity alarm and phone delivery still need physical verification. Full-size pool testing remains future work. This portfolio prototype detects device movement; it does not establish a swimmer's safety or detect drowning.
+The sensors and previous stillness-alert firmware were tested on the bench. The float assembly has now been tested in a water tank, with distinct recordings for calm water, small ripples, and larger disturbances. The activity-alarm firmware, dashboard controls, and optional Mac-to-phone notifications through ntfy are implemented and software-tested. The demo above demonstrates an activity alarm and notification arriving on the iPhone with the physical prototype. Repeatable detection trials, water-only disturbances with the tub stationary, and full-size pool testing remain future work. This portfolio prototype detects device movement; it does not establish a swimmer's safety or detect drowning.
 
 ## How it works
 
@@ -255,7 +263,7 @@ These items are not implemented yet:
 
 - Record a complete wiring diagram, including I2C pins, LED resistor values, and the buzzer model.
 - Analyze recorded sensor logs and compare different bench tests.
-- Verify [iPhone notifications](dashboard/README.md#phone-notifications-iphone) during controlled tank trials and capture a complete demo.
+- Measure [iPhone notification](dashboard/README.md#phone-notifications-iphone) delivery times across repeated controlled tank trials.
 - Add authenticated remote dashboard access or an always-on gateway to replace the Mac bridge.
 - Build a splash-protected enclosure and secure permanent connections.
 - Measure repeatable event detection and false alarms, then evaluate behavior in a full-size pool.
