@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Log the existing pool sketch's serial output on macOS/Linux; no packages needed."""
+"""Log current JSON or legacy pool-sketch USB telemetry on macOS/Linux."""
 import argparse
 import csv
+import json
+import math
 from datetime import datetime
 import os
 from pathlib import Path
@@ -11,18 +13,62 @@ import sys
 import termios
 import time
 
-FIELDS = ["time", "motion_score", "state", "temperature_c", "temperature_f"]
+FIELDS = ["time", "motion_score", "state", "temperature_c", "temperature_f", "motion_threshold"]
+ACTIVITY_STATES = ("DISARMED", "ARMING", "ARMED", "ALERT", "FAULT")
 NUMBER = r"-?\d+(?:\.\d+)?"
 TEMP = re.compile(rf"Probe Temperature: ({NUMBER}) C / ({NUMBER}) F")
+
+
+def reading_row(payload):
+    """Validate telemetry before presenting it as live data; accept old Wi-Fi firmware."""
+    if not isinstance(payload, dict):
+        raise ValueError("Invalid telemetry")
+    version = payload.get('protocol_version')
+    states = ACTIVITY_STATES if version == 2 else ('MOVING', 'STILL_WAITING', 'ALERT', 'UNKNOWN')
+    if payload.get('state') not in states or type(payload.get('sequence')) is not int:
+        raise ValueError('Invalid sensor state')
+    if version not in (None, 2):
+        raise ValueError('Unsupported firmware protocol')
+    for key in ('motion_score', 'temperature_c', 'temperature_f'):
+        value = payload[key]
+        if value is None and key != 'motion_score':
+            continue
+        if type(value) not in (int, float) or not math.isfinite(value):
+            raise ValueError('Invalid sensor reading')
+    if version == 2:
+        threshold = payload.get('motion_threshold')
+        if type(threshold) not in (int, float) or not math.isfinite(threshold) or not .1 <= threshold <= 20:
+            raise ValueError('Invalid movement threshold')
+        remaining, command_id = payload.get('arming_remaining_ms'), payload.get('command_id')
+        if type(remaining) is not int or not 0 <= remaining <= 10000:
+            raise ValueError('Invalid arming countdown')
+        if type(command_id) is not int or not 0 <= command_id <= 2147483647:
+            raise ValueError('Invalid command acknowledgment')
+        if type(payload.get('command_ok')) is not bool or not isinstance(payload.get('command_error'), str):
+            raise ValueError('Invalid command acknowledgment')
+    row = {key: payload.get(key) if payload.get(key) is not None else '' for key in FIELDS if key != 'time'}
+    row['time'] = datetime.now().astimezone().isoformat(timespec='milliseconds')
+    return row
 
 
 class Parser:
     def __init__(self):
         self.row = None
+        self.status = None
 
     def feed(self, line):
         completed = None
+        if line.startswith('{'):
+            try:
+                payload = json.loads(line)
+                row = reading_row(payload)
+            except (ValueError, KeyError, TypeError):
+                return None
+            self.status = payload
+            self.row = None
+            return row
         if line.startswith("Motion Score: "):
+            self.status = None
             try:
                 score = float(line.split(": ", 1)[1])
             except ValueError:
